@@ -13,9 +13,9 @@ app.use(express.json());
 
 // Database connection configuration
 const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
+    host: process.env.MYSQL_HOST || 'localhost',
+    user: process.env.MYSQL_USER || 'root',
+    password: process.env.MYSQL_PASSWORD || '',
 };
 
 async function initDB() {
@@ -23,8 +23,8 @@ async function initDB() {
         const connection = await mysql.createConnection(dbConfig);
 
         // Create database if not exists
-        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME || 'notes_db'}\``);
-        await connection.query(`USE \`${process.env.DB_NAME || 'notes_db'}\``);
+        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.MYSQL_NAME || 'notes_db'}\``);
+        await connection.query(`USE \`${process.env.MYSQL_NAME || 'notes_db'}\``);
 
         // Create notes table if not exists
         const createTableQuery = `
@@ -41,6 +41,8 @@ async function initDB() {
         return connection;
     } catch (err) {
         console.error('Error initializing database:', err);
+        // log all env variables
+        console.log('Environment variables:', process.env);
         process.exit(1);
     }
 }

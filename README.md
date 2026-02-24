@@ -44,10 +44,10 @@ The application will be available at `http://localhost:5173`.
 
 ### Backend (.env)
 - `PORT`: Server port (default: 5000)
-- `DB_HOST`: MySQL host (default: localhost)
-- `DB_USER`: MySQL user (default: root)
-- `DB_PASSWORD`: MySQL password
-- `DB_NAME`: Database name (default: notes_db)
+- `MYSQL_HOST`: MySQL host (default: localhost)
+- `MYSQL_USER`: MySQL user (default: root)
+- `MYSQL_PASSWORD`: MySQL password
+- `MYSQL_NAME`: Database name (default: notes_db)
 
 ## Deployment Instructions
 
@@ -59,7 +59,7 @@ npm run build
 The production-ready files will be in `frontend/dist`.
 
 ### Backend Deployment
-1. Ensure `DB_HOST`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` are correctly set in the environment variables of your hosting provider.
+1. Ensure `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD`, and `MYSQL_NAME` are correctly set in the environment variables of your hosting provider.
 2. Run `npm install --production` in the `backend` folder.
 3. Use a process manager like `pm2` to run `index.js`.
 4. If you are serving both from the same server, you might want to serve the `frontend/dist` folder using Express:
