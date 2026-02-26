@@ -18,23 +18,39 @@ const COLORS = [
 ];
 
 function App() {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [notes, setNotes] = useState<Note[]>(() => {
+    const saved = localStorage.getItem('notes');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedColor, setSelectedColor] = useState(COLORS[0].value);
   const [loading, setLoading] = useState(true);
 
+  const [isOffline, setIsOffline] = useState(false);
+
   useEffect(() => {
     fetchNotes();
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('notes', JSON.stringify(notes));
+  }, [notes]);
+
   const fetchNotes = async () => {
     try {
       const response = await fetch('/api/notes');
-      const data = await response.json();
-      setNotes(data);
+      if (response.ok) {
+        const data = await response.json();
+        setNotes(data);
+        setIsOffline(false);
+      } else {
+        setIsOffline(true);
+      }
     } catch (error) {
       console.error('Error fetching notes:', error);
+      setIsOffline(true);
+      // We already have notes from localStorage, so we just continue
     } finally {
       setLoading(false);
     }
@@ -44,6 +60,20 @@ function App() {
     e.preventDefault();
     if (!title || !content) return;
 
+    const newNote: Note = {
+      id: Date.now(), // Temporary ID
+      title,
+      content,
+      color: selectedColor,
+      created_at: new Date().toISOString(),
+    };
+
+    // Optimistically add to state
+    setNotes((prevNotes) => [newNote, ...prevNotes]);
+    setTitle('');
+    setContent('');
+    setSelectedColor(COLORS[0].value);
+
     try {
       const response = await fetch('/api/notes', {
         method: 'POST',
@@ -52,28 +82,42 @@ function App() {
       });
 
       if (response.ok) {
-        setTitle('');
-        setContent('');
-        setSelectedColor(COLORS[0].value);
-        fetchNotes();
+        const savedNote = await response.json();
+        setIsOffline(false);
+        // Replace temporary note with the one from server (which has the real ID)
+        setNotes((prevNotes) =>
+          prevNotes.map((n) => (n.id === newNote.id ? savedNote : n))
+        );
+      } else {
+        setIsOffline(true);
       }
     } catch (error) {
-      console.error('Error creating note:', error);
+      console.error('Error creating note on backend:', error);
+      setIsOffline(true);
+      // Note stays in local state even if backend fails
     }
   };
 
   const deleteNote = async (id: number) => {
+    // Optimistically remove from state
+    setNotes(notes.filter((note) => note.id !== id));
+
     try {
       const response = await fetch(`/api/notes/${id}`, {
         method: 'DELETE',
       });
-      if (response.ok) {
-        setNotes(notes.filter((note) => note.id !== id));
+      if (!response.ok) {
+        setIsOffline(true);
+        throw new Error('Failed to delete');
       }
+      setIsOffline(false);
     } catch (error) {
       console.error('Error deleting note:', error);
+      setIsOffline(true);
     }
   };
+
+
 
   return (
     <div className="container">
@@ -83,6 +127,7 @@ function App() {
         </h1>
         <p style={{ color: 'var(--text-secondary)' }}>Capture your thoughts, anytime, anywhere.</p>
       </header>
+
 
       <form onSubmit={handleSubmit} className="create-note">
         <input

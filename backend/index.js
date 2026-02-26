@@ -18,6 +18,9 @@ const dbConfig = {
     password: process.env.MYSQL_PASSWORD || '',
 };
 
+let db = null;
+let mockNotes = [];
+
 async function initDB() {
     try {
         const connection = await mysql.createConnection(dbConfig);
@@ -38,24 +41,27 @@ async function initDB() {
     `;
         await connection.query(createTableQuery);
         console.log('Database and table initialized successfully');
-        return connection;
+        db = connection;
     } catch (err) {
-        console.error('Error initializing database:', err);
-        // log all env variables
-        console.log('Environment variables:', process.env);
-        process.exit(1);
+        console.error('Error initializing database. Running in offline/mock mode:', err.message);
+        db = null;
     }
 }
 
 // Routes
-const db = await initDB();
+initDB();
 
 // Get all notes
 app.get('/api/notes', async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM notes ORDER BY created_at DESC');
-        res.json(rows);
+        if (db) {
+            const [rows] = await db.query('SELECT * FROM notes ORDER BY created_at DESC');
+            res.json(rows);
+        } else {
+            res.json([...mockNotes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+        }
     } catch (err) {
+        console.error('Fetch error:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -66,14 +72,31 @@ app.post('/api/notes', async (req, res) => {
     if (!title || !content) {
         return res.status(400).json({ error: 'Title and content are required' });
     }
+
+    const newNote = {
+        id: Date.now(),
+        title,
+        content,
+        color: color || '#ffffff',
+        created_at: new Date().toISOString()
+    };
+
     try {
-        const [result] = await db.query(
-            'INSERT INTO notes (title, content, color) VALUES (?, ?, ?)',
-            [title, content, color || '#ffffff']
-        );
-        res.status(201).json({ id: result.insertId, title, content, color: color || '#ffffff' });
+        if (db) {
+            const [result] = await db.query(
+                'INSERT INTO notes (title, content, color) VALUES (?, ?, ?)',
+                [title, content, color || '#ffffff']
+            );
+            res.status(201).json({ id: result.insertId, title, content, color: color || '#ffffff', created_at: newNote.created_at });
+        } else {
+            mockNotes.push(newNote);
+            res.status(201).json(newNote);
+        }
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Insert error:', err);
+        // Fallback to mock even if DB was supposed to be there but failed during query
+        mockNotes.push(newNote);
+        res.status(201).json(newNote);
     }
 });
 
@@ -81,8 +104,13 @@ app.post('/api/notes', async (req, res) => {
 app.delete('/api/notes/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        await db.query('DELETE FROM notes WHERE id = ?', [id]);
-        res.json({ message: 'Note deleted successfully' });
+        if (db) {
+            await db.query('DELETE FROM notes WHERE id = ?', [id]);
+            res.json({ message: 'Note deleted successfully' });
+        } else {
+            mockNotes = mockNotes.filter(n => n.id != id);
+            res.json({ message: 'Note deleted successfully (from mock)' });
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -91,3 +119,4 @@ app.delete('/api/notes/:id', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
