@@ -50,6 +50,13 @@ async function initDB() {
 // Routes
 const db = await initDB();
 
+app.get('/', async (req, res) => {
+    res.json({status: "success", message: "App is live" });
+});
+app.get('/health', async (req, res) => {
+    res.json({status: "success", message: "App is live" });
+});
+
 // Get all notes
 app.get('/api/notes', async (req, res) => {
     try {
